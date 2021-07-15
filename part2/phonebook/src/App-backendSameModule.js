@@ -2,17 +2,6 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import personService from "./services/person";
 
-const Notification = ({ message, type }) => {
-  if (message === null) return null;
-  if (type === "error") {
-    return <div className="error">{message}</div>;
-  } else if (type === "notif") {
-    return <div className="notif">{message}</div>;
-  } else {
-    return <div className="update">{message}</div>;
-  }
-};
-
 const Filter = ({ newSearch, handleSearchChange }) => {
   return (
     <div>
@@ -64,7 +53,13 @@ const PersonForm = ({
   );
 };
 
-const Persons = ({ persons, newSearch, deletePersonsOf }) => {
+const Persons = ({ persons, newSearch }) => {
+  const deletePersonsOf = (idKey) => {
+    const url = `http://localhost:3001/persons/${idKey}`;
+    const wantToDelete = persons.find((p) => p.id === idKey);
+    axios.delete(url, wantToDelete);
+  };
+
   const filteredPersons =
     newSearch === ""
       ? persons
@@ -91,42 +86,21 @@ const App = () => {
   const [newName, setNewName] = useState("");
   const [newNumber, setNewNumber] = useState("");
   const [newSearch, setNewSearch] = useState("");
-  const [notifMsg, setNotifMsg] = useState(null);
-  const [typeNotif, setTypeNotif] = useState("");
 
   useEffect(() => {
-    personService.getAll().then((response) => {
+    axios.get("http://localhost:3001/persons").then((response) => {
       setPersons(response.data);
     });
   });
 
-  const deletePersonsOf = (idKey) => {
-    const url = `http://localhost:3001/persons/${idKey}`;
-    const wantToDelete = persons.find((p) => p.id === idKey);
-    axios
-      .delete(url, wantToDelete)
-      .catch((error) => {
-        setTypeNotif("error");
-        setNotifMsg(
-          `Information of ${wantToDelete.name} has already been removed from server.`
-        );
-        setTimeout(() => setNotifMsg(null), 5000);
-      })
-      .then(() => {
-        setTypeNotif("notif");
-        setNotifMsg(`${wantToDelete.name}'s number has been deleted`);
-        setTimeout(() => setNotifMsg(null), 5000);
-      });
-  };
-
   const replaceNumber = (newNumber) => {
     const wantToReplace = persons.find((p) => p.name === newName);
+    console.log(wantToReplace);
+    const url = `http://localhost:3001/persons/${wantToReplace.id}`;
     const changedContact = { ...wantToReplace, number: newNumber };
 
-    personService.update(wantToReplace.id, changedContact).then(() => {
-      setTypeNotif("update");
-      setNotifMsg(`${wantToReplace.name}'s number has been replaced.`);
-      setTimeout(() => setNotifMsg(null), 5000);
+    axios.put(url, changedContact).then((response) => {
+      window.alert(`${wantToReplace.name}'s number has been replaced.`);
     });
   };
 
@@ -148,15 +122,15 @@ const App = () => {
         `${newName} is already added to phonebook, replace the old number with a new one?`
       );
       if (answ) {
+        console.log("Replacing...");
         replaceNumber(newNumber);
       }
     } else {
-      personService.create(personObject).then((response) => {
-        setTypeNotif("notif");
-        setNotifMsg(`${newName}'s number has been added.`);
-        setTimeout(() => setNotifMsg(null), 5000);
-        setPersons(persons.concat(response.data));
-      });
+      axios
+        .post("http://localhost:3001/persons", personObject)
+        .then((response) => {
+          setPersons(persons.concat(response.data));
+        });
     }
     setNewName("");
     setNewNumber("");
@@ -176,7 +150,6 @@ const App = () => {
 
   return (
     <div>
-      <Notification message={notifMsg} type={typeNotif} />
       <h2>Phonebook</h2>
       <Filter newSearch={newSearch} handleSearchChange={handleSearchChange} />
       <h2>add a new number </h2>
@@ -188,11 +161,7 @@ const App = () => {
         handleNumberChange={handleNumberChange}
       />
       <h2>Numbers</h2>
-      <Persons
-        persons={persons}
-        newSearch={newSearch}
-        deletePersonsOf={deletePersonsOf}
-      />
+      <Persons persons={persons} newSearch={newSearch} />
     </div>
   );
 };
